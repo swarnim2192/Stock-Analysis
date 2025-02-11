@@ -43,7 +43,7 @@ plt.plot(data['Close'], label='Close Price', color='blue')
 plt.plot(data['MA50'], label='50-Day Moving Average', color='red')
 plt.plot(data['MA200'], label='200-Day Moving Average', color='green')
 plt.legend()
-plt.title('Apple Stock Price Trend with Moving Averages')
+plt.title('Apple Stock Price Trend (With Moving Averages)')
 plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
@@ -52,7 +52,7 @@ plt.show()
 # Volume vs Close Price Analysis
 plt.figure(figsize=(10, 6))
 sns.scatterplot(x=data['Volume'], y=data['Close'])
-plt.title('Volume vs Close Price')
+plt.title('Volume vs Closing Price Relationship')
 plt.xlabel('Volume')
 plt.ylabel('Close Price')
 plt.grid()
@@ -61,6 +61,37 @@ plt.show()
 # Correlation Matrix
 correlation = data.corr()
 plt.figure(figsize=(10, 8))
-sns.heatmap(correlation, annot=True, cmap='coolwarm')
+sns.heatmap(correlation, annot=True, cmap='viridis')
 plt.title('Correlation Matrix')
+plt.show()
+
+# Step 5: Predictive Modeling - Linear Regression
+# Preparing data for Linear Regression
+# Converting Date to an ordinal format for regression analysis
+data['Date_ordinal'] = pd.to_datetime(data.index).map(pd.Timestamp.toordinal)
+
+# Defining features (X) and target (y)
+X = data[['Date_ordinal']]  # Feature: Date in ordinal format
+y = data['Close']           # Target: Closing price
+
+# Linear Regression Model
+model = LinearRegression()
+model.fit(X, y)
+
+# Making predictions
+predictions = model.predict(X)
+
+# Evaluating the model
+mse = mean_squared_error(y, predictions)
+print(f'Mean Squared Error (MSE): {mse}')
+
+# Plotting Actual vs Predicted Prices
+plt.figure(figsize=(14, 7))
+plt.plot(data.index, y, label='Actual Price', color='blue')
+plt.plot(data.index, predictions, label='Predicted Price', linestyle='dashed', color='red')
+plt.legend()
+plt.title('Actual vs Predicted Stock Prices')
+plt.xlabel('Date')
+plt.ylabel('Price (USD)')
+plt.grid()
 plt.show()
