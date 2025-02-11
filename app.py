@@ -9,17 +9,26 @@ from sklearn.preprocessing import StandardScaler
 # App Title
 st.title('📈 Real-Time Apple Stock Price & AI Prediction')
 
+# User Input for Timeframe
+st.sidebar.header('Select Timeframe')
+timeframe = st.sidebar.selectbox(
+    'Choose a timeframe:',
+    options=['1m', '5m', '15m', '30m', '1h', '1d'],
+    index=0
+)
+
 # Fetch Real-Time Data
 ticker = 'AAPL'
-data = yf.download(tickers=ticker, period='1d', interval='1m')  # 1-minute data
+data = yf.download(tickers=ticker, period='1d', interval=timeframe)  # Dynamic timeframe
 
 # Display Real-Time Stock Graph
-st.subheader('📊 Real-Time Stock Price')
+st.subheader(f'📊 Real-Time Stock Price ({timeframe} Interval)')
 plt.figure(figsize=(10, 5))
-plt.plot(data['Close'], label='Real-Time Closing Price')
-plt.xlabel('Time')
-plt.ylabel('Price (USD)')
-plt.legend()
+plt.plot(data['Close'], label='Real-Time Closing Price', color='#26A69A')  # Teal Green
+plt.xlabel('Time', color='#5C6BC0')  # Indigo
+plt.ylabel('Price (USD)', color='#5C6BC0')
+plt.grid(color='#F0F4F8')  # Soft Blue Gray
+plt.legend(facecolor='#FFD54F')  # Amber
 st.pyplot(plt)
 
 # AI Prediction Model
@@ -51,9 +60,11 @@ prediction = model.predict(latest_data)
 
 # Display the Prediction
 if prediction[0] == 1:
-    st.success('🔼 The AI predicts the stock price will go **UP**!')
+    st.success('🔼 The AI predicts the stock price will go **UP**!', icon='📈')
+    st.markdown("<h3 style='color:#26A69A;'>Bullish Trend Detected 🚀</h3>", unsafe_allow_html=True)
 else:
-    st.error('🔽 The AI predicts the stock price will go **DOWN**.')
+    st.error('🔽 The AI predicts the stock price will go **DOWN**.', icon='📉')
+    st.markdown("<h3 style='color:#EF5350;'>Bearish Trend Detected ⚠️</h3>", unsafe_allow_html=True)
 
 # Auto-Refresh Every Minute
 st.caption('⏱️ Data refreshes automatically every minute.')
