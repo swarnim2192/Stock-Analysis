@@ -119,3 +119,21 @@ plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
 plt.show()
+
+# Predicting Future Stock Prices for the Next 30 Days
+future_dates = pd.date_range(start=data.index[-1], periods=30, freq='D')
+future_dates_ordinal = future_dates.map(pd.Timestamp.toordinal).values.reshape(-1, 1)
+
+# Predict future prices
+future_predictions = model.predict(future_dates_ordinal)
+
+# Plotting the Predictions
+plt.figure(figsize=(14, 7))
+plt.plot(data.index, data['Close'], label='Actual Price', color='blue')
+plt.plot(future_dates, future_predictions, label='Predicted Future Price', linestyle='dashed', color='red')
+plt.legend()
+plt.title('Stock Price Prediction for the Next 30 Days')
+plt.xlabel('Date')
+plt.ylabel('Price (USD)')
+plt.grid()
+plt.show()
