@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+import math
 
 # Test to ensure everything works
 print("Libraries imported successfully!")
@@ -95,6 +96,10 @@ predictions = model.predict(X)
 mse = mean_squared_error(y, predictions)
 print(f'Mean Squared Error (MSE): {mse}')
 
+# Calculating RMSE
+rmse = math.sqrt(mean_squared_error(y, predictions))
+print(f'Root Mean Squared Error (RMSE): {rmse}')
+
 # Plotting Actual vs Predicted Prices
 plt.figure(figsize=(14, 7))
 plt.plot(data.index, y, label='Actual Price', color='blue')
@@ -137,10 +142,3 @@ plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
 plt.show()
-
-from sklearn.metrics import mean_squared_error
-import math
-
-# Calculating RMSE
-rmse = math.sqrt(mean_squared_error(y, predictions))
-print(f'Root Mean Squared Error (RMSE): {rmse}')
