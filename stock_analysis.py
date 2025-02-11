@@ -26,3 +26,10 @@ plt.xlabel('Volume')
 plt.ylabel('Close Price')
 plt.grid()
 plt.show()
+# Correlation Matrix
+correlation = data.corr()
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation, annot=True, cmap='coolwarm')
+plt.title('Correlation Matrix')
+plt.show()
