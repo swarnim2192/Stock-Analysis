@@ -8,6 +8,35 @@ from sklearn.metrics import mean_squared_error
 
 # Test to ensure everything works
 print("Libraries imported successfully!")
+
+# Step 1: Fetch Historical Stock Data
+data = yf.download('AAPL', start='2015-01-01', end='2025-01-01')
+
+# Display the first 5 rows to understand the structure
+print(data.head())
+
+# Step 2: Save the Data Locally (Optional)
+data.to_csv('AAPL_stock_data.csv')
+
+# Load the saved data (optional)
+data = pd.read_csv('AAPL_stock_data.csv', index_col='Date', parse_dates=True)
+
+# Step 3: Data Cleaning & Preprocessing
+# Check for Missing Values
+print(data.isnull().sum())
+
+# Handle Missing Data
+# Dropping missing values
+data = data.dropna()
+
+# Verify Data Types
+print(data.dtypes)
+
+# Add Moving Averages for Trend Analysis
+data['MA50'] = data['Close'].rolling(window=50).mean()   # 50-day moving average
+data['MA200'] = data['Close'].rolling(window=200).mean() # 200-day moving average
+
+# Step 4: Exploratory Data Analysis (EDA)
 # Plotting the Closing Price with Moving Averages
 plt.figure(figsize=(14, 7))
 plt.plot(data['Close'], label='Close Price', color='blue')
@@ -19,6 +48,8 @@ plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
 plt.show()
+
+# Volume vs Close Price Analysis
 plt.figure(figsize=(10, 6))
 sns.scatterplot(x=data['Volume'], y=data['Close'])
 plt.title('Volume vs Close Price')
@@ -26,9 +57,9 @@ plt.xlabel('Volume')
 plt.ylabel('Close Price')
 plt.grid()
 plt.show()
+
 # Correlation Matrix
 correlation = data.corr()
-
 plt.figure(figsize=(10, 8))
 sns.heatmap(correlation, annot=True, cmap='coolwarm')
 plt.title('Correlation Matrix')
