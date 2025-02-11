@@ -137,3 +137,10 @@ plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
 plt.show()
+
+from sklearn.metrics import mean_squared_error
+import math
+
+# Calculating RMSE
+rmse = math.sqrt(mean_squared_error(y, predictions))
+print(f'Root Mean Squared Error (RMSE): {rmse}')
