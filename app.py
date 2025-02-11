@@ -1,52 +1,59 @@
 import streamlit as st
-from stock_analysis import get_stock_data
+import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 # App Title
-st.title('📈 Stock Market Analysis Dashboard')
+st.title('📈 Real-Time Apple Stock Price & AI Prediction')
 
-# User Input for Ticker Symbol
-ticker = st.text_input('Enter Stock Ticker:', 'AAPL')
+# Fetch Real-Time Data
+ticker = 'AAPL'
+data = yf.download(tickers=ticker, period='1d', interval='1m')  # 1-minute data
 
-# Fetch Stock Data using the imported function
-data = get_stock_data(ticker)
+# Display Real-Time Stock Graph
+st.subheader('📊 Real-Time Stock Price')
+plt.figure(figsize=(10, 5))
+plt.plot(data['Close'], label='Real-Time Closing Price')
+plt.xlabel('Time')
+plt.ylabel('Price (USD)')
+plt.legend()
+st.pyplot(plt)
 
-# Debugging - Check Available Columns
-st.write("Data Columns:", data.columns)
+# AI Prediction Model
+st.subheader('🤖 AI Prediction: Will the Price Go Up or Down?')
 
-# Handle both possible column names
-if 'Close' in data.columns:
-    close_col = 'Close'
-elif 'Adj Close' in data.columns:
-    close_col = 'Adj Close'
+# Feature Engineering
+data['Price Change'] = data['Close'].diff()
+data['Direction'] = (data['Price Change'] > 0).astype(int)  # 1 if price goes up, 0 if down
+
+# Prepare Data for Model
+data = data.dropna()
+X = data[['Open', 'High', 'Low', 'Volume']]
+y = data['Direction']
+
+# Scaling the Features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Logistic Regression Model
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# Predict the Latest Movement
+latest_data = scaler.transform([X.iloc[-1]])
+prediction = model.predict(latest_data)
+
+# Display the Prediction
+if prediction[0] == 1:
+    st.success('🔼 The AI predicts the stock price will go **UP**!')
 else:
-    st.error("No valid 'Close' or 'Adj Close' column found.")
-    st.stop()
+    st.error('🔽 The AI predicts the stock price will go **DOWN**.')
 
-# Display Raw Data
-st.subheader('📊 Raw Stock Data')
-st.write(data.tail())
-
-# Ensure Moving Averages are Calculated
-if 'MA50' not in data.columns:
-    data['MA50'] = data[close_col].rolling(window=50).mean()
-
-if 'MA200' not in data.columns:
-    data['MA200'] = data[close_col].rolling(window=200).mean()
-
-# Flatten MultiIndex if Present
-if isinstance(data.columns, pd.MultiIndex):
-    data.columns = ['_'.join(col).strip() for col in data.columns]
-
-# Plotting Closing Price
-st.subheader('📈 Closing Price Over Time')
-st.line_chart(data[close_col])
-
-# Plotting Moving Averages
-st.subheader('Moving Averages (50 & 200 Days)')
-st.line_chart(data[[close_col, 'MA50', 'MA200']])
-
-# Volume Analysis
-st.subheader('Trading Volume Over Time')
-st.bar_chart(data['Volume'])
+# Auto-Refresh Every Minute
+st.caption('⏱️ Data refreshes automatically every minute.')
