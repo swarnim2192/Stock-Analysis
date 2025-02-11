@@ -105,3 +105,17 @@ plt.xlabel('Date')
 plt.ylabel('Price (USD)')
 plt.grid()
 plt.show()
+
+# Moving Average Forecasting
+data['SMA30'] = data['Close'].rolling(window=30).mean()  # 30-day simple moving average
+
+# Plotting the Moving Average Forecast
+plt.figure(figsize=(14, 7))
+plt.plot(data['Close'], label='Actual Price', color='blue')
+plt.plot(data['SMA30'], label='30-Day Moving Average', color='orange')
+plt.legend()
+plt.title('Stock Price with 30-Day Moving Average Forecast')
+plt.xlabel('Date')
+plt.ylabel('Price (USD)')
+plt.grid()
+plt.show()
