@@ -18,8 +18,18 @@ print(data.head())
 # Step 2: Save the Data Locally (Optional)
 data.to_csv('AAPL_stock_data.csv')
 
-# Load the saved data (optional)
-data = pd.read_csv('AAPL_stock_data.csv', index_col='Date', parse_dates=True)
+# Load the saved data (debugging added)
+# Checking CSV column headers to debug the 'Date' issue
+temp_data = pd.read_csv('AAPL_stock_data.csv')
+print("CSV Columns:", temp_data.columns)
+
+# Handling potential missing 'Date' column issue
+if 'Date' in temp_data.columns:
+    data = pd.read_csv('AAPL_stock_data.csv', index_col='Date', parse_dates=True)
+else:
+    data = pd.read_csv('AAPL_stock_data.csv')
+    data['Date'] = pd.to_datetime(data.index)
+    data.set_index('Date', inplace=True)
 
 # Step 3: Data Cleaning & Preprocessing
 # Check for Missing Values
