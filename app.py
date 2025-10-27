@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from streamlit_option_menu import option_menu
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 from stock_analysis import (
@@ -11,18 +12,42 @@ from stock_analysis import (
 
 st.set_page_config(page_title="Stock Analysis", layout="wide")
 
-# ---- Header + simple theme toggle (Plotly only) ----
+# ----- Header -----
 st.title("📈 Stock Analysis & Simple ML")
 st.caption("Python • Streamlit • yfinance • scikit-learn • Plotly")
 
-if "plot_theme_dark" not in st.session_state:
-    st.session_state.plot_theme_dark = False
-st.session_state.plot_theme_dark = st.toggle("Dark charts", value=st.session_state.plot_theme_dark, help="Affects charts only")
+# ----- Dark/Light charts toggle (affects Plotly only) -----
+if "dark_charts" not in st.session_state:
+    st.session_state.dark_charts = False
+st.session_state.dark_charts = st.toggle("Dark charts", value=st.session_state.dark_charts, help="Toggles Plotly theme (charts only)")
 
-PLOTLY_TMPL = "plotly_dark" if st.session_state.plot_theme_dark else "plotly"
+TPL = "plotly_dark" if st.session_state.dark_charts else "plotly"
+BG  = "#0e1117" if st.session_state.dark_charts else "white"
+FG  = "#e6e6e6" if st.session_state.dark_charts else "#111111"
+GRID = "#2a2a2a" if st.session_state.dark_charts else "#e5e5e5"
 
-# ---- Top nav (tabs) ----
-tab_home, tab_features, tab_about = st.tabs(["🏠 Home", "✨ Features", "ℹ️ About"])
+def style_fig(fig, title=None):
+    fig.update_layout(
+        template=TPL,
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        font=dict(color=FG),
+        xaxis=dict(gridcolor=GRID),
+        yaxis=dict(gridcolor=GRID),
+        title=title or fig.layout.title.text,
+        margin=dict(l=0, r=0, t=40, b=0),
+    )
+    return fig
+
+# ----- Top navbar (visible pills) -----
+selected = option_menu(
+    None,
+    ["Home", "Features", "About"],
+    icons=["house", "stars", "info-circle"],
+    menu_icon="cast",
+    default_index=0,
+    orientation="horizontal",
+)
 
 with st.sidebar:
     st.header("Controls")
@@ -40,11 +65,11 @@ with st.sidebar:
 def _cached_prices(ticker: str, p: str, i: str) -> pd.DataFrame:
     return fetch_prices(ticker, period=p, interval=i)
 
-# ---------------- HOME ----------------
-with tab_home:
+# =================== HOME ===================
+if selected == "Home":
     col_left, col_right = st.columns([2, 1], gap="large")
     try:
-        # --- Watchlist comparison: normalized returns ---
+        # Watchlist normalized comparison
         st.subheader("📊 Watchlist Comparison (returns normalized to 1)")
         compare_data = {}
         for tk in watchlist:
@@ -58,11 +83,11 @@ with tab_home:
         if compare_data:
             merged = pd.concat(compare_data, axis=1)
             norm = merged / merged.iloc[0]
-            fig_compare = px.line(norm, x=norm.index, y=norm.columns, title="Normalized Returns Comparison", template=PLOTLY_TMPL)
-            fig_compare.update_layout(height=420, margin=dict(l=0,r=0,t=40,b=0))
+            fig_compare = px.line(norm, x=norm.index, y=norm.columns, title="Normalized Returns Comparison")
+            style_fig(fig_compare)
             st.plotly_chart(fig_compare, use_container_width=True)
 
-        # --- Side-by-side price charts (2 per row) ---
+        # Side-by-side price charts
         if compare_data:
             st.subheader("📈 Price charts (per ticker)")
             cols = st.columns(2, gap="large")
@@ -73,15 +98,15 @@ with tab_home:
                     df.columns = df.columns.get_level_values(0)
                 plot_df = df.reset_index()
                 time_col = plot_df.columns[0]
-                fig_tk = px.line(plot_df, x=time_col, y="Close", title=f"{tk} Close ({period}, {interval})", template=PLOTLY_TMPL)
-                fig_tk.update_layout(height=340, margin=dict(l=0,r=0,t=40,b=0))
+                fig_tk = px.line(plot_df, x=time_col, y="Close", title=f"{tk} Close ({period}, {interval})")
+                style_fig(fig_tk)
                 with cols[col_idx]:
                     st.plotly_chart(fig_tk, use_container_width=True)
                 col_idx = 1 - col_idx
                 if col_idx == 0 and tk != watchlist[-1]:
                     cols = st.columns(2, gap="large")
 
-        # --- Single-ticker focus (first in watchlist) ---
+        # Focused single-ticker
         ticker = watchlist[0]
         prices = _cached_prices(ticker, period, interval)
         if isinstance(prices.attrs.get("stale", False), bool) and prices.attrs.get("stale"):
@@ -93,9 +118,10 @@ with tab_home:
             st.subheader(f"{ticker} Price (focus)")
             df_plot = prices.reset_index()
             time_col = df_plot.columns[0]
-            fig = px.line(df_plot, x=time_col, y="Close", title=f"{ticker} Close ({period}, {interval})", template=PLOTLY_TMPL)
-            fig.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=420)
+            fig = px.line(df_plot, x=time_col, y="Close", title=f"{ticker} Close ({period}, {interval})")
+            style_fig(fig)
             st.plotly_chart(fig, use_container_width=True)
+
             st.subheader("Raw Data (tail)")
             st.dataframe(prices.tail(200))
 
@@ -127,7 +153,7 @@ with tab_home:
             st.write("**Features used:**", ", ".join(feats))
             st.caption("Label = 1 if next return > 0 else 0.")
 
-        # --- Evaluation panel ---
+        # Evaluation expander
         with st.expander("📊 Evaluation details (confusion matrix & ROC)"):
             if pipe is not None and not X.empty:
                 n_test = max(1, int(len(X)*0.25))
@@ -144,7 +170,8 @@ with tab_home:
                     z=cm, x=["Pred 0","Pred 1"], y=["True 0","True 1"],
                     text=cm, texttemplate="%{text}", colorscale="Blues"
                 ))
-                cm_fig.update_layout(title="Confusion Matrix", height=320, margin=dict(l=0,r=0,t=40,b=0), template=PLOTLY_TMPL)
+                style_fig(cm_fig, "Confusion Matrix")
+                cm_fig.update_layout(height=320)
                 st.plotly_chart(cm_fig, use_container_width=True)
 
                 fpr, tpr, _ = roc_curve(y_test, y_proba)
@@ -152,8 +179,8 @@ with tab_home:
                 roc_fig = go.Figure()
                 roc_fig.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", name=f"ROC (AUC={roc_auc:.3f})"))
                 roc_fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines", name="Chance", line=dict(dash="dash")))
-                roc_fig.update_layout(title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR",
-                                      height=320, margin=dict(l=0,r=0,t=40,b=0), template=PLOTLY_TMPL)
+                style_fig(roc_fig, "ROC Curve")
+                roc_fig.update_layout(xaxis_title="FPR", yaxis_title="TPR", height=320)
                 st.plotly_chart(roc_fig, use_container_width=True)
             else:
                 st.info("Train the model first to view evaluation plots.")
@@ -161,8 +188,8 @@ with tab_home:
         st.error(f"Error: {e}")
         st.stop()
 
-# ---------------- FEATURES ----------------
-with tab_features:
+# =================== FEATURES ===================
+elif selected == "Features":
     st.header("✨ Features")
     st.markdown("""
 - **Watchlist & compare:** Select multiple tickers and compare normalized returns.
@@ -171,13 +198,13 @@ with tab_features:
 - **Evaluation details:** Confusion Matrix and ROC/AUC.
 - **Caching & fallback:** 5-minute cache, Stooq fallback, and last-good parquet snapshot to handle rate limits.
 - **Ticker/period/interval controls:** Flexible data views with intraday/daily options.
-- **Dark charts toggle:** Switch Plotly theme without forcing the app theme.
+- **Dark charts toggle:** Switch Plotly theme without changing the whole app theme.
     """)
 
-# ---------------- ABOUT ----------------
-with tab_about:
+# =================== ABOUT ===================
+else:
     st.header("ℹ️ About")
     st.markdown("""
-This portfolio app demonstrates a Python-only stack: **Streamlit** (UI) + **yfinance/Stooq** (data) + **pandas** (ETL) + **scikit-learn** (ML) + **Plotly** (charts).
-It predicts next-bar direction using engineered features (returns, MA ratios, RSI, Bollinger Z).
+This portfolio app uses **Streamlit** (UI), **yfinance/Stooq** (data), **pandas** (ETL), **scikit-learn** (ML), and **Plotly** (charts).
+It predicts next-bar direction with engineered features (returns, MA ratios, RSI, Bollinger Z).
 """)
