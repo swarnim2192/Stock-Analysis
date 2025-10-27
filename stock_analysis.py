@@ -1,11 +1,15 @@
 from __future__ import annotations
-import time
-import random
+import logging
+logging.getLogger("yfinance").setLevel(logging.ERROR)
+import os, time, random
+from dataclasses import dataclass
+from typing import Tuple, Dict, Optional
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from dataclasses import dataclass
-from typing import Tuple, Dict, Optional
+from pandas_datareader import data as pdr
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
@@ -13,16 +17,15 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import joblib
 
-# Optional HTTP caching to avoid re-downloading the same data repeatedly
+# Optional HTTP cache to reduce repeat hits to Yahoo
 try:
     import requests_cache
-    _session = requests_cache.CachedSession(
-        cache_name="yfinance_cache",
-        backend="sqlite",
-        expire_after=300,      # 5 minutes
-    )
+    _session = requests_cache.CachedSession("yfinance_cache", backend="sqlite", expire_after=300)
 except Exception:
     _session = None
+
+DATA_DIR = "data_cache"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 @dataclass
 class TrainResult:
@@ -30,45 +33,81 @@ class TrainResult:
     metrics: Dict[str, float]
     feature_names: list[str]
 
+def _cache_path(ticker: str, period: str, interval: str) -> str:
+    safe = f"{ticker}_{period}_{interval}".replace("/", "-")
+    return os.path.join(DATA_DIR, f"{safe}.parquet")
+
+def _limit_by_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    # Map Streamlit-like periods to days
+    days_map = {"1mo": 31, "3mo": 93, "6mo": 186, "1y": 366, "2y": 732, "5y": 1830}
+    if period in days_map:
+        cutoff = df.index.max() - pd.Timedelta(days=days_map[period])
+        df = df[df.index >= cutoff]
+    return df
+
+def _fetch_yfinance(ticker: str, period: str, interval: str) -> pd.DataFrame:
+    df = yf.download(
+        ticker, period=period, interval=interval,
+        auto_adjust=True, progress=False, group_by="column",
+        session=_session, timeout=30, threads=False
+    )
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    return df
+
+def _fetch_stooq(ticker: str, period: str) -> pd.DataFrame:
+    # Stooq provides DAILY data only; no key required
+    df = pdr.DataReader(ticker, "stooq")  # returns most-recent first
+    df = df.sort_index()                  # ascending time
+    df = df[["Open", "High", "Low", "Close", "Volume"]]
+    df = _limit_by_period(df, period)
+    return df
+
 def fetch_prices(ticker: str, period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
-    """
-    Download OHLCV data with retries + caching to mitigate Yahoo rate limits.
-    Ensures flat columns even if yfinance returns a MultiIndex.
-    """
-    max_tries = 5
+    """Try Yahoo → Stooq → last-good parquet. Always return flat columns."""
+    path = _cache_path(ticker, period, interval)
+
+    # 1) Try Yahoo (few gentle retries)
+    max_tries = 3
     for attempt in range(1, max_tries + 1):
         try:
-            df = yf.download(
-                ticker,
-                period=period,
-                interval=interval,
-                auto_adjust=True,
-                progress=False,
-                group_by="column",
-                session=_session,
-                timeout=30,
-            )
-            # Flatten columns defensively
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            if df is None or df.empty:
-                raise ValueError("Empty dataframe returned")
-
-            return df.dropna().copy()
-
+            df = _fetch_yfinance(ticker, period, interval)
+            if df is not None and not df.empty:
+                df = df.dropna().copy()
+                try: df.to_parquet(path)
+                except Exception: pass
+                return df
+            raise ValueError("Empty dataframe from Yahoo")
         except Exception as e:
             msg = str(e)
-            # Backoff on rate limit or transient network issues
-            if "Rate limit" in msg or "Too Many Requests" in msg or "HTTP" in msg or "timed out" in msg or "Empty dataframe" in msg:
-                if attempt == max_tries:
-                    raise ValueError(f"No data returned for {ticker} (period={period}, interval={interval}). Last error: {msg}")
-                # Exponential backoff with jitter
-                sleep_s = (2 ** (attempt - 1)) + random.uniform(0, 0.5)
-                time.sleep(sleep_s)
-            else:
-                # Not a transient error: raise immediately
-                raise
+            transient = any(s in msg for s in ["Rate limit", "Too Many Requests", "HTTP", "timed out", "Empty"])
+            if transient and attempt < max_tries:
+                time.sleep((2 ** (attempt - 1)) + random.uniform(0, 0.5))
+                continue
+            break  # move to stooq
+
+    # 2) Stooq fallback (daily only). If user asked intraday, we still return daily.
+    try:
+        df = _fetch_stooq(ticker, period)
+        if df is not None and not df.empty:
+            try: df.to_parquet(path)
+            except Exception: pass
+            # mimic yfinance auto_adjust behavior already reflected in Stooq close
+            return df.dropna().copy()
+    except Exception:
+        pass
+
+    # 3) Last-good parquet snapshot
+    if os.path.exists(path):
+        try:
+            df = pd.read_parquet(path)
+            if not df.empty:
+                df.attrs["stale"] = True
+                return df
+        except Exception:
+            pass
+
+    raise ValueError(f"No data returned for {ticker} (period={period}, interval={interval}).")
 
 def _rsi(series: pd.Series, window: int = 14) -> pd.Series:
     delta = series.diff()
