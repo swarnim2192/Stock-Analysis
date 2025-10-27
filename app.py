@@ -1,70 +1,70 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-
-# App Title
-st.title('📈 Real-Time Apple Stock Price & AI Prediction')
-
-# User Input for Timeframe
-st.sidebar.header('Select Timeframe')
-timeframe = st.sidebar.selectbox(
-    'Choose a timeframe:',
-    options=['1m', '5m', '15m', '30m', '1h', '1d'],
-    index=0
+import plotly.express as px
+from stock_analysis import (
+    fetch_prices, make_features, train_model,
+    save_model, load_model, latest_prediction
 )
 
-# Fetch Real-Time Data
-ticker = 'AAPL'
-data = yf.download(tickers=ticker, period='1d', interval=timeframe)  # Dynamic timeframe
+st.set_page_config(page_title="Stock Analysis", layout="wide")
+st.title("📈 Stock Analysis & Simple ML")
+st.caption("Python • Streamlit • yfinance • scikit-learn • Plotly")
 
-# Display Real-Time Stock Graph
-st.subheader(f'📊 Real-Time Stock Price ({timeframe} Interval)')
-plt.figure(figsize=(10, 5))
-plt.plot(data['Close'], label='Real-Time Closing Price', color='#26A69A')  # Teal Green
-plt.xlabel('Time', color='#5C6BC0')  # Indigo
-plt.ylabel('Price (USD)', color='#5C6BC0')
-plt.grid(color='#F0F4F8')  # Soft Blue Gray
-plt.legend(facecolor='#FFD54F')  # Amber
-st.pyplot(plt)
+with st.sidebar:
+    st.header("Controls")
+    ticker = st.text_input("Ticker", value="AAPL").upper().strip()
+    period = st.selectbox("Period", ["1mo","3mo","6mo","1y","2y","5y"], index=2)
+    interval = st.selectbox("Interval", ["1d","1h","30m","15m","5m"], index=0)
+    retrain = st.button("🔁 Train / Update Model")
 
-# AI Prediction Model
-st.subheader('🤖 AI Prediction: Will the Price Go Up or Down?')
+@st.cache_data(show_spinner=True)
+def _cached_prices(t: str, p: str, i: str) -> pd.DataFrame:
+    return fetch_prices(t, period=p, interval=i)
 
-# Feature Engineering
-data['Price Change'] = data['Close'].diff()
-data['Direction'] = (data['Price Change'] > 0).astype(int)  # 1 if price goes up, 0 if down
+col_left, col_right = st.columns([2, 1], gap="large")
 
-# Prepare Data for Model
-data = data.dropna()
-X = data[['Open', 'High', 'Low', 'Volume']]
-y = data['Direction']
+try:
+    prices = _cached_prices(ticker, period, interval)
 
-# Scaling the Features
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+    with col_left:
+        st.subheader(f"{ticker} Price")
+        df_plot = prices.reset_index()
+        time_col = df_plot.columns[0]
+        fig = px.line(df_plot, x=time_col, y="Close", title=f"{ticker} Close ({period}, {interval})")
+        fig.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=420)
+        st.plotly_chart(fig, use_container_width=True)
 
-# Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+        st.subheader("Raw Data (tail)")
+        st.dataframe(prices.tail(200))
 
-# Logistic Regression Model
-model = LogisticRegression()
-model.fit(X_train, y_train)
+    with col_right:
+        st.subheader("Model")
+        X, y, feats = make_features(prices)
+        pipe = load_model("model.joblib")
 
-# Predict the Latest Movement
-latest_data = scaler.transform([X.iloc[-1]])
-prediction = model.predict(latest_data)
+        if retrain or pipe is None:
+            with st.spinner("Training model..."):
+                result = train_model(X, y)
+                pipe = result.pipeline
+                save_model(result, "model.joblib")
+                st.success("Model trained and saved.")
+                st.metric("Accuracy", f"{result.metrics['accuracy']:.3f}")
+                st.metric("Precision", f"{result.metrics['precision']:.3f}")
+                st.metric("Recall", f"{result.metrics['recall']:.3f}")
+                st.metric("F1", f"{result.metrics['f1']:.3f}")
+                st.caption(f"Train n={result.metrics['n_train']}, Test n={result.metrics['n_test']}")
+        else:
+            st.success("Loaded saved model. Click **Train / Update Model** to retrain.")
 
-# Display the Prediction
-if prediction[0] == 1:
-    st.success('🔼 The AI predicts the stock price will go **UP**!', icon='📈')
-    st.markdown("<h3 style='color:#26A69A;'>Bullish Trend Detected 🚀</h3>", unsafe_allow_html=True)
-else:
-    st.error('🔽 The AI predicts the stock price will go **DOWN**.', icon='📉')
-    st.markdown("<h3 style='color:#EF5350;'>Bearish Trend Detected ⚠️</h3>", unsafe_allow_html=True)
+        pred = latest_prediction(pipe, X)
+        if pred is not None:
+            st.metric("Next-bar Direction (model)", "⬆️ Up" if pred == 1 else "⬇️ Down")
+        else:
+            st.warning("Not enough data for a prediction yet.")
 
-# Auto-Refresh Every Minute
-st.caption('⏱️ Data refreshes automatically every minute.')
+        st.divider()
+        st.write("**Features used:**", ", ".join(feats))
+        st.caption("Label = 1 if next return > 0 else 0.")
+except Exception as e:
+    st.error(f"Error: {e}")
+    st.stop()
