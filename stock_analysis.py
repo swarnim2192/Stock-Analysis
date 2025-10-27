@@ -1,4 +1,6 @@
 from __future__ import annotations
+import time
+import random
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -11,6 +13,17 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import joblib
 
+# Optional HTTP caching to avoid re-downloading the same data repeatedly
+try:
+    import requests_cache
+    _session = requests_cache.CachedSession(
+        cache_name="yfinance_cache",
+        backend="sqlite",
+        expire_after=300,      # 5 minutes
+    )
+except Exception:
+    _session = None
+
 @dataclass
 class TrainResult:
     pipeline: Pipeline
@@ -18,10 +31,44 @@ class TrainResult:
     feature_names: list[str]
 
 def fetch_prices(ticker: str, period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
-    df = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
-    if df.empty:
-        raise ValueError(f"No data returned for {ticker} (period={period}, interval={interval}).")
-    return df.dropna().copy()
+    """
+    Download OHLCV data with retries + caching to mitigate Yahoo rate limits.
+    Ensures flat columns even if yfinance returns a MultiIndex.
+    """
+    max_tries = 5
+    for attempt in range(1, max_tries + 1):
+        try:
+            df = yf.download(
+                ticker,
+                period=period,
+                interval=interval,
+                auto_adjust=True,
+                progress=False,
+                group_by="column",
+                session=_session,
+                timeout=30,
+            )
+            # Flatten columns defensively
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
+            if df is None or df.empty:
+                raise ValueError("Empty dataframe returned")
+
+            return df.dropna().copy()
+
+        except Exception as e:
+            msg = str(e)
+            # Backoff on rate limit or transient network issues
+            if "Rate limit" in msg or "Too Many Requests" in msg or "HTTP" in msg or "timed out" in msg or "Empty dataframe" in msg:
+                if attempt == max_tries:
+                    raise ValueError(f"No data returned for {ticker} (period={period}, interval={interval}). Last error: {msg}")
+                # Exponential backoff with jitter
+                sleep_s = (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+                time.sleep(sleep_s)
+            else:
+                # Not a transient error: raise immediately
+                raise
 
 def _rsi(series: pd.Series, window: int = 14) -> pd.Series:
     delta = series.diff()

@@ -26,6 +26,10 @@ col_left, col_right = st.columns([2, 1], gap="large")
 try:
     prices = _cached_prices(ticker, period, interval)
 
+    # Ensure flat columns for plotting even if yfinance returns MultiIndex
+    if isinstance(prices.columns, pd.MultiIndex):
+        prices.columns = prices.columns.get_level_values(0)
+
     with col_left:
         st.subheader(f"{ticker} Price")
         df_plot = prices.reset_index()
