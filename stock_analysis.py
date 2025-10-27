@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-logging.getLogger("yfinance").setLevel(logging.ERROR)
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 import os, time, random
 from dataclasses import dataclass
 from typing import Tuple, Dict, Optional
@@ -49,7 +49,7 @@ def _fetch_yfinance(ticker: str, period: str, interval: str) -> pd.DataFrame:
     df = yf.download(
         ticker, period=period, interval=interval,
         auto_adjust=True, progress=False, group_by="column",
-        session=_session, timeout=30, threads=False
+        session=_session, timeout=30, raise_errors=False
     )
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
