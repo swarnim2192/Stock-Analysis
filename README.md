@@ -1,3 +1,5 @@
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://stock-analysis-kfvmhhdfye8zacg8gzwb2z.streamlit.app/)
+
 📈 Stock Market Analysis with Real-Time Dashboard and AI Prediction
 
 🚀 Project Overview
