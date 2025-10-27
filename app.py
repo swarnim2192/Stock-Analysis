@@ -105,7 +105,7 @@ if selected == "Home":
             norm = merged / merged.iloc[0]
             fig_compare = px.line(norm, x=norm.index, y=norm.columns, title="Normalized Returns Comparison")
             style_fig(fig_compare)
-            st.plotly_chart(fig_compare, use_container_width=True)
+            st.plotly_chart(fig_compare, use_container_width=True, key="compare")
 
         # Side-by-side price charts
         if compare_data:
@@ -121,7 +121,7 @@ if selected == "Home":
                 fig_tk = px.line(plot_df, x=time_col, y="Close", title=f"{tk} Close ({period}, {interval})")
                 style_fig(fig_tk)
                 with cols[col_idx]:
-                    st.plotly_chart(fig_tk, use_container_width=True)
+                    st.plotly_chart(fig_tk, use_container_width=True, key=f"price-{tk}-{period}-{interval}")
                 col_idx = 1 - col_idx
                 if col_idx == 0 and tk != watchlist[-1]:
                     cols = st.columns(2, gap="large")
@@ -140,7 +140,7 @@ if selected == "Home":
             time_col = df_plot.columns[0]
             fig = px.line(df_plot, x=time_col, y="Close", title=f"{ticker} Close ({period}, {interval})")
             style_fig(fig)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key="focus")
 
             st.subheader("Raw Data (tail)")
             st.dataframe(prices.tail(200))
@@ -202,7 +202,7 @@ if selected == "Home":
                 ))
                 style_fig(cm_fig, "Confusion Matrix")
                 cm_fig.update_layout(height=320)
-                st.plotly_chart(cm_fig, use_container_width=True)
+                st.plotly_chart(cm_fig, use_container_width=True, key="cm")
 
                 fpr, tpr, _ = roc_curve(y_test, y_proba)
                 roc_auc = auc(fpr, tpr)
@@ -211,7 +211,7 @@ if selected == "Home":
                 roc_fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines", name="Chance", line=dict(dash="dash")))
                 style_fig(roc_fig, "ROC Curve")
                 roc_fig.update_layout(xaxis_title="FPR", yaxis_title="TPR", height=320)
-                st.plotly_chart(roc_fig, use_container_width=True)
+                st.plotly_chart(roc_fig, use_container_width=True, key="roc")
             else:
                 st.info("Train the model first to view evaluation plots.")
     except Exception as e:
