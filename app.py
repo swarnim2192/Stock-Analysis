@@ -16,7 +16,7 @@ st.set_page_config(page_title="Stock Analysis", layout="wide")
 st.title("📈 Stock Analysis & Simple ML")
 st.caption("Python • Streamlit • yfinance • scikit-learn • Plotly")
 
-# ----- Dark/Light charts toggle (affects Plotly only) -----
+# ----- Dark/Light charts (Plotly only) -----
 if "dark_charts" not in st.session_state:
     st.session_state.dark_charts = False
 st.session_state.dark_charts = st.toggle("Dark charts", value=st.session_state.dark_charts, help="Toggles Plotly theme (charts only)")
@@ -39,7 +39,7 @@ def style_fig(fig, title=None):
     )
     return fig
 
-# ----- Top navbar (visible pills) -----
+# ----- Top navbar -----
 selected = option_menu(
     None,
     ["Home", "Features", "About"],
@@ -49,16 +49,36 @@ selected = option_menu(
     orientation="horizontal",
 )
 
+# ----- One-time welcome banner (on first visit only) -----
+if "welcomed" not in st.session_state:
+    st.info(
+        "👋 **Welcome!** Pick one or more tickers in the sidebar, choose a period & interval, "
+        "then click **Train / Update Model** to (re)train. Use **Export CSV** under the table to download data.",
+        icon="✅",
+    )
+    st.session_state.welcomed = True
+
 with st.sidebar:
     st.header("Controls")
     watchlist = st.multiselect(
         "Select Ticker(s)",
         ["AAPL", "MSFT", "TSLA", "GOOG", "AMZN", "META", "NFLX"],
         default=["AAPL"],
+        help="Choose one or more stocks to visualize and compare."
     )
-    period = st.selectbox("Period", ["1mo","3mo","6mo","1y","2y","5y"], index=2)
-    interval = st.selectbox("Interval", ["1d","1h","30m","15m","5m"], index=0)
-    retrain = st.button("🔁 Train / Update Model")
+    period = st.selectbox(
+        "Period",
+        ["1mo","3mo","6mo","1y","2y","5y"],
+        index=2,
+        help="How far back to load data."
+    )
+    interval = st.selectbox(
+        "Interval",
+        ["1d","1h","30m","15m","5m"],
+        index=0,
+        help="Bar size (daily vs intraday). Intraday may hit rate limits sooner."
+    )
+    retrain = st.button("🔁 Train / Update Model", help="Re-train the model on the most recent data.")
     st.caption("If rate-limited, try again in ~30–60s or change period/interval.")
 
 @st.cache_data(show_spinner=True, ttl=300)
@@ -124,6 +144,16 @@ if selected == "Home":
 
             st.subheader("Raw Data (tail)")
             st.dataframe(prices.tail(200))
+
+            # ---- Export CSV buttons (Quick Win #3) ----
+            csv_bytes = prices.to_csv(index=True).encode()
+            st.download_button(
+                "📥 Export CSV (price data)",
+                data=csv_bytes,
+                file_name=f"{ticker}_{period}_{interval}.csv",
+                mime="text/csv",
+                help="Download the table above as CSV."
+            )
 
         with col_right:
             st.subheader("Model")
@@ -199,6 +229,8 @@ elif selected == "Features":
 - **Caching & fallback:** 5-minute cache, Stooq fallback, and last-good parquet snapshot to handle rate limits.
 - **Ticker/period/interval controls:** Flexible data views with intraday/daily options.
 - **Dark charts toggle:** Switch Plotly theme without changing the whole app theme.
+- **Export CSV:** Download the displayed price table as CSV.
+- **Guided help:** Tooltips describe each control for new users.
     """)
 
 # =================== ABOUT ===================
