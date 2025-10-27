@@ -240,3 +240,31 @@ else:
 This portfolio app uses **Streamlit** (UI), **yfinance/Stooq** (data), **pandas** (ETL), **scikit-learn** (ML), and **Plotly** (charts).
 It predicts next-bar direction with engineered features (returns, MA ratios, RSI, Bollinger Z).
 """)
+
+# ---- Sticky footer ----
+st.markdown(
+    """
+    <style>
+    footer {
+        visibility: hidden;
+    }
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: rgba(0,0,0,0.6);
+        color: white;
+        text-align: center;
+        padding: 8px 0;
+        font-size: 13px;
+        backdrop-filter: blur(6px);
+    }
+    </style>
+    <div class="footer">
+        Made with passion using <b>Streamlit</b> by <a href="https://github.com/swarnim2192" target="_blank" style="color:#00BFFF;text-decoration:none;">Swarnim Khanal</a> |
+        <a href="https://stock-analysis-kfvmhhdfye8zacg8gzwb2z.streamlit.app/" target="_blank" style="color:#00BFFF;text-decoration:none;">View App</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
