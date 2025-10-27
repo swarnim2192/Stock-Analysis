@@ -26,7 +26,7 @@ multitasking==0.0.12
 narwhals==2.10.0
 numpy==2.3.4
 packaging==25.0
-pandas-datareader
+pandas-datareader>=0.10.0
 pandas==2.3.3
 peewee==3.18.2
 pillow==11.3.0
@@ -47,6 +47,7 @@ rpds-py==0.28.0
 scikit-learn==1.7.2
 scipy==1.16.2
 seaborn==0.13.2
+setuptools
 six==1.17.0
 smmap==5.0.2
 soupsieve==2.8
